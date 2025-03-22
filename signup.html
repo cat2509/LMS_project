@@ -1,0 +1,114 @@
+<?php
+session_start();
+$is_invalid = false;
+
+if (\$_SERVER["REQUEST_METHOD"] === "POST") {
+    require __DIR__ . "/database.php";
+    
+    // Prepare SQL statement
+    $sql = "SELECT * FROM user WHERE email = ?";
+    $stmt = $mysqli->prepare($sql);
+    $stmt->bind_param("s", \$_POST["email"]);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $user = $result->fetch_assoc();
+    
+    if ($user && password_verify(\$_POST["password"], $user["password_hash"])) {
+        $_SESSION["user_id"] = $user["id"];
+        echo "<script>alert('Login successful!'); window.location.href='index.php';</script>";
+        exit();
+    }
+    $is_invalid = true;
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/jwt-decode@3.1.2/build/jwt-decode.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #ffffff;
+            margin: 0;
+        }
+        .container {
+            width: 30%;
+            margin: auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .input label {
+            display: block;
+            text-align: left;
+        }
+        .input input {
+            width: 100%;
+            padding: 8px;
+        }
+        .toggle-password {
+            cursor: pointer;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #b91a1a;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Login</h2>
+        <?php if ($is_invalid): ?>
+            <p style="color:red;">Invalid credentials!</p>
+        <?php endif; ?>
+        <form action="login.php" method="post">
+            <div class="input">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="input">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">Login</button>
+        </form>
+        <div id="google-signin"></div>
+    </div>
+
+    <script>
+        function handleCredentialResponse(response) {
+            const responsePayload = jwt_decode(response.credential);
+            fetch("google-login.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token: response.credential })
+            }).then(res => res.json()).then(data => {
+                if (data.success) {
+                    alert("Google Login Successful!");
+                    window.location.href = "index.php";
+                } else {
+                    alert("Google Login Failed!");
+                }
+            });
+        }
+        window.onload = function () {
+            google.accounts.id.initialize({
+                client_id: "YOUR_GOOGLE_CLIENT_ID",
+                callback: handleCredentialResponse
+            });
+            google.accounts.id.renderButton(
+                document.getElementById("google-signin"),
+                { theme: "outline", size: "large" }
+            );
+        };
+    </script>
+</body>
+</html>
